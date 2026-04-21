@@ -1,0 +1,110 @@
+services:
+  pubsub:
+    image: google/cloud-sdk:emulators
+    command: gcloud beta emulators pubsub start --project jeitto-backend-local --host-port 0.0.0.0:8085
+    environment:
+      - CLOUDSDK_CORE_PROJECT=jeitto-backend-local
+    volumes:
+      - pubsub_data:/data
+    ports:
+      - "8085:8085"
+    networks:
+      - app-tier
+    extra_hosts:
+      - "localhost:host-gateway"
+  
+  app:
+    build: 
+      context: .
+      dockerfile: ../Dockerfile
+    volumes:
+      - .:/workspaces/app:cached  
+    command: sleep infinity
+    networks:
+      - app-tier
+
+  mongo:
+    image: mongo:6.0.24
+    restart: unless-stopped
+    healthcheck:
+      # Este teste verifica se o nó atual é o primário do replica set.
+      test: |
+        mongosh --host localhost --port 27017 --quiet --eval \
+          'quit(db.isMaster().ismaster ? 0 : 1)'
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    command: >
+      sh -c "
+        echo '1. Starting mongod with replication and auth...'
+        openssl rand -base64 756 > mongo-keyfile; chmod 400 mongo-keyfile;
+        mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo/mongo-keyfile &
+        PID=\$!
+
+        echo '2. Waiting for mongod to be ready...'
+        until mongosh --host localhost --eval 'db.runCommand(\"ping\")' > /dev/null 2>&1; do
+          echo '...'
+          sleep 2
+        done
+        echo 'MongoDB is ready!'
+
+        echo '3. Initiating replica set...'
+        mongosh --host localhost --eval 'rs.initiate({_id: \"rs0\", members: [{_id: 0, host: \"mongo:27017\"}]})'
+
+        echo '4. Waiting for replica set to elect a primary...'
+        until mongosh --host localhost --eval 'db.isMaster().ismaster' > /dev/null 2>&1; do
+          echo '...'
+          sleep 2
+        done
+        echo 'Primary has been elected!'
+
+        echo '5. Creating the root user...'
+        mongosh --host localhost --eval \"
+          db.getSiblingDB('admin').createUser({
+            user: 'root',
+            pwd: 'rootpwd',
+            roles: [{ role: 'root', db: 'admin' }]
+          })
+        \"
+        echo 'User root created!'
+
+        echo '6. Creating default database and collections...'
+        mongosh --host localhost --eval '
+          db.getSiblingDB(\"default_db\").createCollection(\"renegotiations\");
+          db.getSiblingDB(\"default_db\").createCollection(\"renegotiations-raw\");
+          print(\"Database and collections created successfully!\");
+        '
+        echo 'Database and collections created!'
+
+        echo '7. Setup complete. Tailing logs...'
+        wait \$PID
+      "
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb:/data/db
+    networks:
+      - app-tier
+  
+  mongo-express:
+    image: mongo-express
+    restart: unless-stopped
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: rootpwd
+      ME_CONFIG_MONGODB_URL: mongodb://root:rootpwd@mongo:27017/?replicaSet=rs0
+      ME_CONFIG_BASICAUTH: false
+    networks:
+      - app-tier
+
+volumes:
+  mongodb:
+  mongo-express:
+  pubsub_data:
+
+networks:
+  app-tier:
+    driver: bridge

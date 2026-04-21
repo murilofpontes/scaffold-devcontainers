@@ -1,0 +1,94 @@
+{
+    // Define o nome do seu ambiente de desenvolvimento.
+    //  Pode ser específico do projeto ou genérico como "Python Dev Container".
+    "name": "Python Development Environment",
+    // --- Opções de Imagem Base/Build ---
+    // Você pode escolher uma das seguintes abordagens para definir a imagem do contêiner:
+    // Opção 1: Usar um Dockerfile personalizado para maior controle (recomendado para o seu caso).
+    // O 'context' geralmente aponta para a pasta onde o Dockerfile está ou para a raiz do projeto.
+    "build": {
+        "dockerfile": "../Dockerfile", // Caminho para o seu Dockerfile centralizado
+        "context": ".." // O contexto do build (diretório pai do .devcontainer)
+    },
+    // Opção 2: Usar um docker-compose.yml para coordenar múltiplos serviços (como app e db).
+    // Descomente e ajuste se você estiver usando docker-compose.
+    // "dockerComposeFile": "./docker-compose.yml",
+    // "service": "app", // O nome do serviço no seu docker-compose.yml que será o devcontainer
+    // Opção 3: Usar uma imagem Docker pré-construída diretamente.
+    // Descomente e ajuste se você não precisar de Dockerfile ou docker-compose.
+    // "image": "mcr.microsoft.com/devcontainers/python:3.13",
+    // --- Features (Recursos Adicionais) ---
+    // Instalação de ferramentas extras diretamente no contêiner.
+    "features": {
+        // Exemplo: Docker-in-Docker para poder rodar comandos Docker dentro do contêiner.
+        // Necessário se você usa docker-compose dentro do devcontainer.
+        "ghcr.io/devcontainers/features/docker-from-docker:1": {
+            "version": "latest"
+        },
+        // Ferramentas Git adicionais.
+        "ghcr.io/devcontainers/features/git:1": {},
+        // Exemplo: Node.js (se seu projeto também tiver frontend JavaScript/TypeScript)
+        // "ghcr.io/devcontainers/features/node:1": {
+        //     "version": "latest"
+        // }
+    },
+    // --- Montagens de Volumes/Arquivos (Mounts) ---
+    // Mapeamento de arquivos ou diretórios do host para o contêiner.
+    "mounts": [
+        // Necessário para 'docker-from-docker' funcionar e interagir com o daemon Docker do host.
+        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+        // Mapeia o .gitconfig local para o contêiner para manter suas configurações Git.
+        "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached",
+        // Mapeia sua chave SSH privada para acesso a repositórios privados (ajuste o caminho se necessário).
+        "source=${localEnv:HOME}/.ssh/id_rsa,target=/home/vscode/.ssh/id_rsa,type=bind,consistency=cached"
+    ],
+    // --- Personalizações do VS Code ---
+    "customizations": {
+        "vscode": {
+            // Configurações padrão do VS Code para este contêiner.
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.linting.pylintEnabled": true, // Habilita o Pylint
+                "python.formatting.provider": "black", // Define Black como formatter padrão
+                "editor.formatOnSave": true, // Formata ao salvar
+                "[python]": {
+                    "editor.defaultFormatter": "ms-python.python" // Formatter padrão para arquivos Python
+                },
+                "editor.tabSize": 4, // Exemplo de outra configuração
+                "files.eol": "\n" // Exemplo de outra configuração
+            },
+            // Extensões do VS Code a serem instaladas automaticamente.
+            "extensions": [
+                "ms-python.python", // Extensão oficial do Python
+                "ms-python.vscode-pylance", // Análise de código e autocompletar avançado
+                "ms-azuretools.vscode-docker", // Ferramentas Docker
+                "ms-toolsai.jupyter", // Se você usa Jupyter notebooks
+                "charliermarsh.ruff", // Linter e formatter rápido
+                "streetsidesoftware.code-spell-checker", // Corretor ortográfico
+                "eamodio.gitlens", // Ferramentas avançadas de Git
+                "editorconfig.editorconfig" // Suporte a .editorconfig
+            ]
+        }
+    },
+    // --- Comandos Pós-Criação ---
+    // Comandos a serem executados após a criação e inicialização do contêiner.
+    // Use um objeto se precisar de nomes para os comandos ou se tiver muitos.
+    "postCreateCommand": {
+        "install poetry env": "poetry env use python3.13", // Usa Python 3.13 com Poetry
+        "install project dependencies": "poetry install --no-root" // Instala dependências do projeto
+    },
+    // Ou, se for um único comando simples:
+    // "postCreateCommand": "pip install -r requirements.txt",
+    // --- Portas Encaminhadas ---
+    // Portas do contêiner que devem ser acessíveis na máquina local.
+    "forwardPorts": [
+        8000, // Porta padrão para FastAPI
+        5000, // Outra porta comum para web apps
+        5432 // Porta padrão para PostgreSQL (se você tiver um serviço de DB no docker-compose)
+    ],
+    // --- Configurações do Usuário e Workspace ---
+    "remoteUser": "vscode", // O usuário padrão para rodar o devcontainer
+    // O diretório de trabalho padrão dentro do contêiner.
+    // Lembre-se: este caminho DEVE corresponder ao volume montado do seu docker-compose.yml!
+    "workspaceFolder": "/workspace" // Alinhado com `volumes: - .:/workspace:cached`
+}

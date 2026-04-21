@@ -1,0 +1,52 @@
+{
+    "name": "standalone-app",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": "."
+    },
+     "features": {
+        "ghcr.io/devcontainers/features/docker-from-docker:1": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/git:1": {},
+    },
+     "mounts": [
+        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+        "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.ssh/id_rsa,target=/home/vscode/.ssh/id_rsa,type=bind,consistency=cached"
+    ],
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.linting.pylintEnabled": true, 
+                "python.formatting.provider": "black", 
+                "editor.formatOnSave": true, 
+                "[python]": {
+                    "editor.defaultFormatter": "ms-python.python"
+                },
+                "editor.tabSize": 4,
+                "files.eol": "\n" 
+            },
+            "extensions": [
+                "ms-python.python", 
+                "ms-python.vscode-pylance", 
+                "ms-azuretools.vscode-docker",
+                "ms-toolsai.jupyter", 
+                "charliermarsh.ruff", 
+                "streetsidesoftware.code-spell-checker", 
+                "eamodio.gitlens", 
+                "editorconfig.editorconfig" 
+            ]
+        }
+    },
+    "postCreateCommand": {
+        "install poetry env": "poetry env use python3.13", 
+        "install project dependencies": "poetry install --no-root" 
+    },
+    "forwardPorts": [
+        8000
+    ], 
+    "remoteUser": "vscode", 
+    "workspaceFolder": "/workspaces"
+}
